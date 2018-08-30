@@ -1,368 +1,126 @@
 #requires -runasadministrator
 
+# Housekeeping
 Clear-Host
-
 $Counter = 0
+
 # Welcome banner
 Write-Host "******************************" -ForegroundColor Magenta
 Write-Host "** Sophos uninstall script. **" -ForegroundColor Magenta
 Write-Host "******************************`n`n`n" -ForegroundColor Magenta
-Write-Host "Informational messages are in Cyan" -ForegroundColor Cyan
-Write-Host "Success messages are in Green" -ForegroundColor Green
-Write-Host "Warning messages are in Yellow" -ForegroundColor Yellow
-Write-Host "Error messages are in Red`n`n`n" -ForegroundColor Red
 
-# Get a list of installed apps
-Write-Host "Gathering installed applications..." -ForegroundColor Cyan
-$Apps = Get-WmiObject win32_product
+# This is just some added logic to the uninstall process wrapped as a function.
+Function Remove-Sophos
+    {
+        Param ($Application)
+        # Get Sophos services and stop them.
+        $Service = Get-Service | Where-Object {$_.Name -like "*Sophos*" -and $_.Status -like "Running"}
+        try
+            {
+                Stop-Service $Service
+            }
+        catch
+            {
+                Write-Error "Unable to stop the service $($Service.Name)"
+            }
 
-# Stop the Sophos AU service as advised by Sophos.
-Write-Host "Stopping Sophos AutoUpdate Service" -ForegroundColor Cyan
-try {
-    Stop-Service -Name "Sophos AutoUpdate Service" -ErrorAction SilentlyContinue
-    Write-Host "Successfully stopped the service`n" -ForegroundColor Green
-}
-catch {
-    Write-Host "ERROR: Failed to stop the service.`n" -ForegroundColor Red
-}
 
-# Go through each of the apps in order and uninstall them.
-ForEach ($App in $Apps)
+                Write-Output "Attempting to uninstall $($Application.Name)"
+                                try 
+                                    {
+                                        Uninstall-Package $Application.Name
+                                        $Counter = 1
+                                        Write-Verbose "Confirming that $($Application.Name) is uninstalled..."
+                                        $Installed = Get-Package | Where-Object {$_.Name -like $Application.Name}
+                                        While ($Installed -and $Counter -lt 4) 
+                                            {
+                                                Write-Warning "$($Application.Name) was not uninstalled, trying again... ($Counter)"
+                                                Uninstall-Package $Application.Name
+                                                $Counter++
+                                            }
+
+                                        If ($Installed)
+                                            {
+                                                Write-Error "ERROR: Unable to uninstall $($Application.Name) after $Counter times"
+                                            }
+
+                                        Else
+                                            {
+                                                Write-Output "Successfully removed $($Application.Name)"
+                                                $Counter = 0
+                                            }
+                                    }
+                                catch 
+                                    {
+                                        Write-Error "Error: Failed to remove $($Application.Name)"
+                                    }
+    } # End of the function
+
+# Gather the installed Sophos components.
+Write-Output "Gathering installed applications..."
+$AppArray = Get-Package | Where-Object {$_.Name -like "*Sophos*"}
+
+# Go through each of the apps in the order specified by Sophos and uninstall them.
+ForEach ($App in $AppArray)
     {
         switch ($App.Name)
             {
                 "Sophos Patch Agent" 
                     {
-                        Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                        try {
-                            $App.Uninstall()
-                            $Counter = 1
-                            Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                            $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                            While ($Installed -and $Counter -lt 4) 
-                                {
-                                    Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                    $App.Uninstall()
-                                    $Counter++
-                                }
-
-                            If ($Installed)
-                                {
-                                    Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                                }
-
-                            Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                            $Counter =0
-                        }
-                        catch {
-                            Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                        }
+                        Remove-Sophos $App
                     }
                 "Sophos Compliance Agent" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Network Threat Protection" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos System Protection" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Client Firewall" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Anti-Virus" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Remote Management System" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Management Communication System" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos AutoUpdate" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos SafeGuard components" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Health" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
+                    {
+                        Remove-Sophos $App
                     }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }
                 "Sophos Heartbeat" 
-                {
-                    Write-Host "Attempting to uninstall $($App.Name)" -ForegroundColor Cyan
-                    try {
-                        $App.Uninstall()
-                        $Counter = 1
-                        Write-Host "Confirming that the app is uninstalled..." -ForegroundColor Cyan
-                        $Installed = Get-WmiObject win32_product | Where-Object {$_.Name -like $App.Name}
-                        While ($Installed -and $Counter -lt 4) 
-                            {
-                                Write-Host "App was not uninstalled, trying again... ($Counter)" -ForegroundColor Yellow
-                                $App.Uninstall()
-                                $Counter++
-                            }
-
-                        If ($Installed)
-                            {
-                                Write-Host "ERROR: Unable to uninstall $App after $Counter times" -ForegroundColor Red
-                            }
-
-                        Write-Host "Successfully removed $($App.Name)" -ForegroundColor Green
-                        $Counter =0
-                    }
-                    catch {
-                        Write-Host "Error: Failed to remove $($App.Name)" -ForegroundColor Red
-                    }
-                }                
+                    {
+                        Remove-Sophos $App
+                    }                
             }
     }
 
-Write-Host "Attempting to uninstall Sophos Endpoint Defense" -ForegroundColor Cyan
+Write-Output "Attempting to uninstall Sophos Endpoint Defense"
         try {
             start-process "C:\Program Files\Sophos\Endpoint Defense\uninstall.exe"
-            Write-Host "Successfully removed Sophos Endpoint Defense" -ForegroundColor Green
+            Write-Output "Successfully removed Sophos Endpoint Defense"
         }
         catch {
-            Write-Host "Error: Failed to remove Sophos Endpoint Defense" -ForegroundColor Red
+            Write-Error "Error: Failed to remove Sophos Endpoint Defense"
         }
